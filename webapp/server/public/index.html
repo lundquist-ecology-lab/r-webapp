@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Terminal</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1e1e1e; color: #d4d4d4; }
+    .container { display: flex; height: 100vh; }
+    .terminal-panel { flex: 1; display: flex; flex-direction: column; min-width: 300px; border-right: 2px solid #3c3c3c; }
+    .file-panel { flex: 1; display: flex; flex-direction: column; min-width: 300px; }
+    .panel-header { padding: 10px 16px; background: #252526; border-bottom: 1px solid #3c3c3c; font-size: 13px; font-weight: 600; color: #cccccc; display: flex; align-items: center; gap: 8px; }
+    .panel-header svg { width: 16px; height: 16px; }
+    .terminal-frame { flex: 1; border: none; background: #1e1e1e; }
+    .breadcrumb { padding: 8px 16px; background: #2d2d2d; border-bottom: 1px solid #3c3c3c; font-size: 12px; color: #9cdcfe; display: flex; align-items: center; gap: 4px; min-height: 36px; }
+    .breadcrumb span { cursor: pointer; color: #9cdcfe; }
+    .breadcrumb span:hover { text-decoration: underline; color: #dcdcaa; }
+    .breadcrumb .sep { color: #666; cursor: default; }
+    .breadcrumb .sep:hover { text-decoration: none; }
+    .file-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+    .file-item { display: flex; align-items: center; padding: 4px 16px; cursor: pointer; font-size: 13px; gap: 10px; user-select: none; }
+    .file-item:hover { background: #2a2d2e; }
+    .file-item.selected { background: #094771; }
+    .file-item .icon { width: 18px; text-align: center; flex-shrink: 0; }
+    .file-item .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-item .size { color: #858585; font-size: 11px; flex-shrink: 0; }
+    .file-item .modified { color: #858585; font-size: 11px; flex-shrink: 0; }
+    .image-preview { border-top: 1px solid #3c3c3c; background: #1e1e1e; padding: 12px; display: none; }
+    .image-preview.active { display: block; }
+    .image-preview img { max-width: 100%; max-height: 400px; border: 1px solid #3c3c3c; }
+    .image-preview .image-info { font-size: 11px; color: #858585; margin-top: 8px; }
+    .image-preview .close-btn { position: absolute; top: 8px; right: 12px; cursor: pointer; color: #858585; font-size: 18px; background: none; border: none; }
+    .image-preview .close-btn:hover { color: #d4d4d4; }
+    .image-preview-wrapper { position: relative; }
+    .text-editor { flex: 1; display: none; flex-direction: column; }
+    .text-editor.active { display: flex; }
+    .text-editor textarea { flex: 1; background: #1e1e1e; color: #d4d4d4; border: none; padding: 12px; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; font-size: 13px; resize: none; outline: none; line-height: 1.5; }
+    .text-editor .editor-header { padding: 6px 16px; background: #252526; border-bottom: 1px solid #3c3c3c; font-size: 12px; color: #cccccc; display: flex; align-items: center; gap: 8px; }
+    .text-editor .save-btn { background: #0e639c; color: white; border: none; padding: 3px 12px; font-size: 11px; cursor: pointer; border-radius: 3px; }
+    .text-editor .save-btn:hover { background: #1177bb; }
+    .context-menu { position: fixed; background: #252526; border: 1px solid #3c3c3c; border-radius: 4px; padding: 4px 0; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); min-width: 160px; display: none; }
+    .context-menu.active { display: block; }
+    .context-menu-item { padding: 6px 16px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+    .context-menu-item:hover { background: #094771; }
+    .context-menu-sep { height: 1px; background: #3c3c3c; margin: 4px 0; }
+    .resize-handle { width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0; }
+    .resize-handle:hover, .resize-handle.active { background: #007fd4; }
+    .empty-state { display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 14px; }
+    ::-webkit-scrollbar { width: 10px; }
+    ::-webkit-scrollbar-track { background: #1e1e1e; }
+    ::-webkit-scrollbar-thumb { background: #424242; border-radius: 5px; }
+    ::-webkit-scrollbar-thumb:hover { background: #555; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="terminal-panel">
+      <div class="panel-header">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M10 13a1 1 0 0 0 1-1V4a1 1 0 1 0-2 0v8a1 1 0 0 0 1 1zm2 0a2 2 0 0 1-2-2V3a2 2 0 1 1 4 0v8a2 2 0 0 1-2 2zm-9-1a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm1 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>
+        Terminal
+      </div>
+      <div class="terminal-frame" id="terminal" style="flex:1;"></div>
+    </div>
+    <div class="resize-handle" id="resizeHandle"></div>
+    <div class="file-panel">
+      <div class="panel-header">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.93 0 1.81.574 2.097 1.418l.238.495c.126.264.4.437.698.437h4.503a1.5 1.5 0 0 1 1.481 1.265l.493-2.955A1.5 1.5 0 0 0 11.62 1H6.5a2.5 2.5 0 0 0-2.436 1.918L3.75 5H2.5A1.5 1.5 0 0 1 1 3.5zm1.5-.5a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5V6.873a2.5 2.5 0 0 0-2.497-2.5H6.483a1.5 1.5 0 0 1-1.464-1.023L4.782 2.56A1.5 1.5 0 0 0 3.264 2H2.5z"/></svg>
+        File Explorer
+      </div>
+      <div class="breadcrumb" id="breadcrumb"></div>
+      <div class="file-list" id="fileList"></div>
+      <div class="image-preview-wrapper">
+        <div class="image-preview" id="imagePreview">
+          <button class="close-btn" onclick="closeImagePreview()">&times;</button>
+          <img id="previewImg" src="" alt="Preview">
+          <div class="image-info" id="imageInfo"></div>
+        </div>
+      </div>
+      <div class="text-editor" id="textEditor">
+        <div class="editor-header">
+          <span id="editorFileName"></span>
+          <button class="save-btn" onclick="saveFile()">Save</button>
+          <button class="save-btn" style="background:#c93" onclick="closeEditor()">Close</button>
+        </div>
+        <textarea id="editorTextarea" spellcheck="false"></textarea>
+      </div>
+    </div>
+  </div>
+  <div class="context-menu" id="contextMenu"></div>
+
+  <link rel="stylesheet" href="/xterm.css" />
+  <script src="/xterm.min.js"></script>
+  <script>
+    let currentPath = '/home';
+    let selectedFile = null;
+    let editingFile = null;
+
+    // File browser
+    async function loadFiles(dir) {
+      currentPath = dir;
+      selectedFile = null;
+      closeImagePreview();
+      closeEditor();
+      const res = await fetch(`/api/files?dir=${encodeURIComponent(dir)}`);
+      const data = await res.json();
+      renderBreadcrumb(data.path);
+      renderFileList(data.items);
+    }
+
+    function renderBreadcrumb(path) {
+      const parts = path.split('/').filter(Boolean);
+      let html = `<span onclick="navigateTo('/')">root</span>`;
+      let accumulated = '';
+      for (const part of parts) {
+        accumulated += '/' + part;
+        html += `<span class="sep">/</span><span onclick="navigateTo('${accumulated}')">${part}</span>`;
+      }
+      document.getElementById('breadcrumb').innerHTML = html;
+    }
+
+    function renderFileList(items) {
+      const list = document.getElementById('fileList');
+      if (items.length === 0) {
+        list.innerHTML = '<div class="empty-state">Empty directory</div>';
+        return;
+      }
+      list.innerHTML = items.map(item => {
+        const icon = item.isDirectory ? '📁' : getImageIcon(item.name);
+        const size = item.size != null ? formatSize(item.size) : '';
+        const modified = item.modified ? new Date(item.modified).toLocaleString() : '';
+        const sel = selectedFile === item.path ? ' selected' : '';
+        return `<div class="file-item${sel}" ondblclick="openItem('${item.path}', ${item.isDirectory})" onclick="selectFile('${item.path}', event)" oncontextmenu="showContextMenu(event, '${item.path}', ${item.isDirectory})">
+          <span class="icon">${icon}</span>
+          <span class="name">${item.name}</span>
+          ${size ? `<span class="size">${size}</span>` : ''}
+          ${modified ? `<span class="modified">${modified}</span>` : ''}
+        </div>`;
+      }).join('');
+    }
+
+    function getImageIcon(name) {
+      const ext = name.split('.').pop().toLowerCase();
+      const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico', 'avif'];
+      if (imageExts.includes(ext)) return '🖼️';
+      const textExts = ['txt', 'md', 'log', 'csv'];
+      if (textExts.includes(ext)) return '📄';
+      const codeExts = ['js', 'ts', 'py', 'html', 'css', 'json', 'xml', 'yml', 'yaml', 'sh', 'bash', 'rb', 'go', 'rs', 'c', 'cpp', 'h', 'java', 'php', 'sql', 'md'];
+      if (codeExts.includes(ext)) return '📝';
+      return '📄';
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    function navigateTo(path) { loadFiles(path); }
+
+    function selectFile(path, e) {
+      if (e) e.stopPropagation();
+      selectedFile = path;
+      fetch(`/api/files?dir=${encodeURIComponent(currentPath)}`).then(r => r.json()).then(data => renderFileList(data.items));
+    }
+
+    async function openItem(path, isDir) {
+      if (isDir) {
+        loadFiles(path);
+      } else {
+        const ext = path.split('.').pop().toLowerCase();
+        const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico', 'avif'];
+        if (imageExts.includes(ext)) {
+          showImagePreview(path);
+        } else {
+          openTextEditor(path);
+        }
+      }
+    }
+
+    async function showImagePreview(path) {
+      const preview = document.getElementById('imagePreview');
+      const img = document.getElementById('previewImg');
+      const info = document.getElementById('imageInfo');
+      img.src = `/api/files/read?file=${encodeURIComponent(path)}`;
+      info.textContent = path;
+      preview.classList.add('active');
+    }
+
+    function closeImagePreview() {
+      document.getElementById('imagePreview').classList.remove('active');
+    }
+
+    async function openTextEditor(path) {
+      editingFile = path;
+      document.getElementById('textEditor').classList.add('active');
+      document.getElementById('fileList').style.display = 'none';
+      document.getElementById('breadcrumb').style.display = 'none';
+      document.getElementById('editorFileName').textContent = path;
+      const res = await fetch(`/api/files/read?file=${encodeURIComponent(path)}`);
+      const data = await res.json();
+      document.getElementById('editorTextarea').value = data.content;
+    }
+
+    function closeEditor() {
+      document.getElementById('textEditor').classList.remove('active');
+      document.getElementById('fileList').style.display = '';
+      document.getElementById('breadcrumb').style.display = '';
+      editingFile = null;
+    }
+
+    async function saveFile() {
+      if (!editingFile) return;
+      const content = document.getElementById('editorTextarea').value;
+      await fetch('/api/files/write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file: editingFile, content })
+      });
+    }
+
+    function showContextMenu(e, path, isDir) {
+      e.preventDefault();
+      e.stopPropagation();
+      const menu = document.getElementById('contextMenu');
+      let html = '';
+      if (!isDir) {
+        html += `<div class="context-menu-item" onclick="copyPath('${path}')">📋 Copy path</div>`;
+      }
+      html += `<div class="context-menu-sep"></div>`;
+      html += `<div class="context-menu-item" style="color:#f44747" onclick="deleteItem('${path}')">🗑️ Delete</div>`;
+      menu.innerHTML = html;
+      menu.style.left = e.clientX + 'px';
+      menu.style.top = e.clientY + 'px';
+      menu.classList.add('active');
+    }
+
+    function copyPath(path) {
+      navigator.clipboard.writeText(path);
+      hideContextMenu();
+    }
+
+    async function deleteItem(path) {
+      if (!confirm(`Delete ${path}?`)) return;
+      await fetch('/api/files/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path })
+      });
+      loadFiles(currentPath);
+      hideContextMenu();
+    }
+
+    function hideContextMenu() {
+      document.getElementById('contextMenu').classList.remove('active');
+    }
+
+    document.addEventListener('click', hideContextMenu);
+
+    // Resize handle
+    const resizeHandle = document.getElementById('resizeHandle');
+    let isResizing = false;
+    resizeHandle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      resizeHandle.classList.add('active');
+      document.body.style.cursor = 'col-resize';
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      const container = document.querySelector('.container');
+      const rect = container.getBoundingClientRect();
+      const percent = ((e.clientX - rect.left) / rect.width) * 100;
+      const clamped = Math.max(20, Math.min(80, percent));
+      document.querySelector('.terminal-panel').style.flex = `0 0 ${clamped}%`;
+      document.querySelector('.file-panel').style.flex = `0 0 ${100 - clamped}%`;
+    });
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        resizeHandle.classList.remove('active');
+        document.body.style.cursor = '';
+      }
+    });
+
+    // Terminal via WebSocket
+    (function initTerminal() {
+      const termEl = document.getElementById('terminal');
+      const term = new Terminal({
+        cursorBlink: true,
+        fontFamily: 'Cascadia Code, Fira Code, Consolas, monospace',
+        fontSize: 13,
+        theme: {
+          background: '#1e1e1e',
+          foreground: '#d4d4d4',
+          cursor: '#aeafad',
+          selectionBackground: '#264f78',
+        },
+      });
+      term.open(termEl);
+
+      let ws = null;
+      let reconnectTimer = null;
+
+      function connect() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${proto}//${location.host}`);
+        ws.onopen = () => {
+          term.on('resize', (size) => {
+            ws.send(JSON.stringify({ type: 'resize', data: size }));
+          });
+        };
+        ws.onmessage = (evt) => {
+          const msg = JSON.parse(evt.data);
+          if (msg.type === 'output') {
+            term.write(Buffer.from(msg.data, 'base64'));
+          } else if (msg.type === 'close') {
+            ws.close();
+          }
+        };
+        ws.onclose = () => {
+          reconnectTimer = setTimeout(connect, 3000);
+        };
+        ws.onerror = () => {
+          ws.close();
+        };
+      }
+
+      term.onData((data) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'input', data: btoa(data) }));
+        }
+      });
+
+      term.onResize((size) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'resize', data: size }));
+        }
+      });
+
+      connect();
+    })();
+
+    // Initial load
+    loadFiles('/home');
+  </script>
+</body>
+</html>
