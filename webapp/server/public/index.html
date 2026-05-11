@@ -92,7 +92,7 @@
   <link rel="stylesheet" href="/xterm.css" />
   <script src="/xterm.min.js"></script>
   <script>
-    let currentPath = '/home';
+    let currentPath = '/home/webterm';
     let selectedFile = null;
     let editingFile = null;
 
@@ -283,9 +283,11 @@
       }
     });
 
-    // Terminal via WebSocket
+    // Terminal via WebSocket — speaks ttyd binary protocol directly
     (function initTerminal() {
       const termEl = document.getElementById('terminal');
+      const enc = new TextEncoder();
+
       const term = new Terminal({
         cursorBlink: true,
         fontFamily: 'Cascadia Code, Fira Code, Consolas, monospace',
@@ -298,51 +300,99 @@
         },
       });
       term.open(termEl);
+      term.focus();
+      termEl.addEventListener('click', () => term.focus());
+
+      function fitTerm() {
+        if (!termEl.clientWidth || !termEl.clientHeight) return;
+        const viewport = termEl.querySelector('.xterm-viewport');
+        if (!viewport || !term.cols || !term.rows) return;
+        const cellW = viewport.scrollWidth / term.cols;
+        const cellH = viewport.scrollHeight / term.rows;
+        if (!cellW || !cellH) return;
+        const cols = Math.max(10, Math.floor(termEl.clientWidth / cellW));
+        const rows = Math.max(2, Math.floor(termEl.clientHeight / cellH));
+        if (cols !== term.cols || rows !== term.rows) term.resize(cols, rows);
+      }
+      setTimeout(fitTerm, 150);
+      window.addEventListener('resize', fitTerm);
 
       let ws = null;
-      let reconnectTimer = null;
+
+      function sendInput(data) {
+        console.log('[term] onData fired, ws state:', ws?.readyState, 'data:', JSON.stringify(data));
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          console.warn('[term] ws not open, dropping input');
+          return;
+        }
+        const encoded = enc.encode(data);
+        const payload = new Uint8Array(encoded.length + 1);
+        payload[0] = 0x30; // '0' = INPUT
+        payload.set(encoded, 1);
+        ws.send(payload);
+        console.log('[term] sent input bytes:', payload.length);
+      }
+
+      function sendResize(cols, rows) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const msg = enc.encode(JSON.stringify({ columns: cols, rows: rows }));
+        const payload = new Uint8Array(msg.length + 1);
+        payload[0] = 0x31; // '1' = RESIZE_TERMINAL
+        payload.set(msg, 1);
+        ws.send(payload);
+      }
 
       function connect() {
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
         ws = new WebSocket(`${proto}//${location.host}`);
+        ws.binaryType = 'arraybuffer';
+
         ws.onopen = () => {
-          term.on('resize', (size) => {
-            ws.send(JSON.stringify({ type: 'resize', data: size }));
-          });
+          console.log('[term] WS connected, cols:', term.cols, 'rows:', term.rows);
+          term.focus();
+          ws.send(enc.encode(JSON.stringify({ AuthToken: '', columns: term.cols, rows: term.rows })));
         };
+
         ws.onmessage = (evt) => {
-          const msg = JSON.parse(evt.data);
-          if (msg.type === 'output') {
-            term.write(Buffer.from(msg.data, 'base64'));
-          } else if (msg.type === 'close') {
-            ws.close();
-          }
+          if (typeof evt.data === 'string') return;
+          const buf = new Uint8Array(evt.data);
+          console.log('[term] received msg type:', buf[0].toString(16), 'len:', buf.length);
+          if (buf[0] === 0x30) term.write(buf.slice(1)); // '0' = OUTPUT
         };
-        ws.onclose = () => {
-          reconnectTimer = setTimeout(connect, 3000);
+
+        ws.onclose = (e) => {
+          console.log('[term] WS closed, code:', e.code);
+          setTimeout(connect, 3000);
         };
-        ws.onerror = () => {
+        ws.onerror = (e) => {
+          console.error('[term] WS error:', e);
           ws.close();
         };
       }
 
-      term.onData((data) => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'input', data: btoa(data) }));
-        }
-      });
+      term.onData(sendInput);
+      term.onResize(({ cols, rows }) => sendResize(cols, rows));
 
-      term.onResize((size) => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'resize', data: size }));
-        }
+      // Fallback: capture keydown on the terminal container in case xterm focus fails
+      termEl.addEventListener('keydown', (e) => {
+        console.log('[term] keydown on termEl:', e.key);
       });
 
       connect();
     })();
 
     // Initial load
-    loadFiles('/home');
+    async function loadInitialFiles() {
+      try {
+        const res = await fetch('/api/config');
+        const config = await res.json();
+        loadFiles(config.fileExplorerHome || currentPath);
+      } catch {
+        loadFiles(currentPath);
+      }
+    }
+
+    loadInitialFiles();
   </script>
 </body>
 </html>
