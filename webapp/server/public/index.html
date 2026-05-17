@@ -46,7 +46,33 @@
     .context-menu-sep { height: 1px; background: #3c3c3c; margin: 4px 0; }
     .resize-handle { width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0; }
     .resize-handle:hover, .resize-handle.active { background: #007fd4; }
+    .auth-overlay { position: fixed; inset: 0; background: #1a1a2e; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .auth-card { background: #16213e; border: 1px solid #3c3c3c; border-radius: 8px; padding: 40px; width: 100%; max-width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    .auth-header { text-align: center; margin-bottom: 32px; }
+    .auth-header h1 { color: #d4d4d4; font-size: 24px; margin-bottom: 8px; }
+    .auth-header .subtitle { color: #888; font-size: 14px; }
+    .auth-form { display: flex; flex-direction: column; gap: 16px; }
+    .form-group label { display: block; color: #9cdcfe; font-size: 13px; margin-bottom: 4px; }
+    .form-group input { background: #1e1e1e; border: 1px solid #3c3c3c; color: #d4d4d4; padding: 8px 12px; border-radius: 4px; font-size: 14px; outline: none; }
+    .form-group input:focus { border-color: #007fd4; }
+    .auth-btn { background: #0e639c; color: white; border: none; padding: 10px; font-size: 14px; border-radius: 4px; cursor: pointer; margin-top: 8px; }
+    .auth-btn:hover { background: #1177bb; }
+    .auth-btn.secondary { background: #444; margin-top: 8px; }
+    .auth-btn.secondary:hover { background: #555; }
+    .auth-error { color: #f44747; font-size: 13px; min-height: 20px; margin-top: 4px; }
+    .auth-switch { text-align: center; color: #888; font-size: 13px; margin-top: 12px; }
+    .auth-switch a { color: #9cdcfe; cursor: pointer; }
+    .auth-switch a:hover { text-decoration: underline; }
+    .home-actions { text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; margin-top: 24px; }
+    .home-actions .subtitle { color: #4ade80; }
     .empty-state { display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 14px; }
+    .logout-btn { margin-left: auto; background: none; color: #858585; border: 1px solid #444; padding: 2px 8px; font-size: 11px; cursor: pointer; border-radius: 3px; white-space: nowrap; }
+    .logout-btn:hover { background: #c0392b; color: white; border-color: #c0392b; }
+    .header-user { font-size: 11px; color: #666; margin-left: auto; }
+    .upload-btn { margin-left: auto; background: #0e639c; color: white; border: none; padding: 3px 10px; font-size: 11px; cursor: pointer; border-radius: 3px; white-space: nowrap; }
+    .upload-btn:hover { background: #1177bb; }
+    .upload-status { color: #858585; font-size: 11px; max-width: 42%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-list.drag-over { outline: 2px dashed #0e639c; outline-offset: -8px; background: rgba(14, 99, 156, 0.12); }
     ::-webkit-scrollbar { width: 10px; }
     ::-webkit-scrollbar-track { background: #1e1e1e; }
     ::-webkit-scrollbar-thumb { background: #424242; border-radius: 5px; }
@@ -54,11 +80,73 @@
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="auth-overlay" id="authOverlay">
+    <div class="auth-card" id="loginCard">
+      <div class="auth-header">
+        <h1>Web Terminal</h1>
+        <p class="subtitle">Multi-user terminal platform</p>
+      </div>
+      <form class="auth-form" id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="loginUsername">Username</label>
+          <input type="text" id="loginUsername" required autocomplete="username" autofocus>
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="auth-btn" id="loginBtn">Log In</button>
+        <p class="auth-error" id="loginError"></p>
+        <p class="auth-switch">Don't have an account? <a href="#" onclick="showRegister(event)">Register</a></p>
+      </form>
+    </div>
+    <div class="auth-card" id="registerCard" style="display:none;">
+      <div class="auth-header">
+        <h1>Create Account</h1>
+        <p class="subtitle">Register for your own terminal</p>
+      </div>
+      <form class="auth-form" id="registerForm" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label for="regUsername">Username</label>
+          <input type="text" id="regUsername" required autocomplete="username" minlength="3" maxlength="30">
+        </div>
+        <div class="form-group">
+          <label for="regEmail">Email</label>
+          <input type="email" id="regEmail" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="regPassword">Password</label>
+          <input type="password" id="regPassword" required autocomplete="new-password" minlength="6">
+        </div>
+        <div class="form-group">
+          <label for="regPasswordConfirm">Confirm Password</label>
+          <input type="password" id="regPasswordConfirm" required autocomplete="new-password">
+        </div>
+        <button type="submit" class="auth-btn" id="registerBtn">Register</button>
+        <p class="auth-error" id="registerError"></p>
+        <p class="auth-switch">Already have an account? <a href="#" onclick="showLogin(event)">Log In</a></p>
+      </form>
+    </div>
+    <div class="auth-card" id="homeCard" style="display:none;">
+      <div class="auth-header">
+        <h1>Welcome</h1>
+        <p class="subtitle" id="welcomeText"></p>
+      </div>
+      <div class="home-actions">
+        <button class="auth-btn" onclick="enterApp()">Continue to Terminal</button>
+        <p class="auth-switch"><a href="#" onclick="handleLogout(event)">Log out</a></p>
+        <button class="auth-btn secondary" onclick="switchUser()">Switch User</a></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container" id="appContainer" style="display:none;">
     <div class="terminal-panel">
       <div class="panel-header">
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M10 13a1 1 0 0 0 1-1V4a1 1 0 1 0-2 0v8a1 1 0 0 0 1 1zm2 0a2 2 0 0 1-2-2V3a2 2 0 1 1 4 0v8a2 2 0 0 1-2 2zm-9-1a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm1 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>
         Terminal
+        <span class="header-user" id="headerUser"></span>
+        <button class="logout-btn" onclick="handleLogout(null)">Log out</button>
       </div>
       <div class="terminal-frame" id="terminal" style="flex:1;"></div>
     </div>
@@ -67,6 +155,9 @@
       <div class="panel-header">
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.93 0 1.81.574 2.097 1.418l.238.495c.126.264.4.437.698.437h4.503a1.5 1.5 0 0 1 1.481 1.265l.493-2.955A1.5 1.5 0 0 0 11.62 1H6.5a2.5 2.5 0 0 0-2.436 1.918L3.75 5H2.5A1.5 1.5 0 0 1 1 3.5zm1.5-.5a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5V6.873a2.5 2.5 0 0 0-2.497-2.5H6.483a1.5 1.5 0 0 1-1.464-1.023L4.782 2.56A1.5 1.5 0 0 0 3.264 2H2.5z"/></svg>
         File Explorer
+        <span class="upload-status" id="uploadStatus"></span>
+        <button class="upload-btn" onclick="document.getElementById('fileUploadInput').click()">Upload</button>
+        <input type="file" id="fileUploadInput" multiple style="display:none" onchange="uploadSelectedFiles(event)">
       </div>
       <div class="breadcrumb" id="breadcrumb"></div>
       <div class="file-list" id="fileList"></div>
@@ -82,6 +173,7 @@
           <span id="editorFileName"></span>
           <button class="save-btn" onclick="saveFile()">Save</button>
           <button class="save-btn" style="background:#c93" onclick="closeEditor()">Close</button>
+          <span style="margin-left:auto;color:#666;font-size:11px;" id="userDisplay"></span>
         </div>
         <textarea id="editorTextarea" spellcheck="false"></textarea>
       </div>
@@ -92,45 +184,267 @@
   <link rel="stylesheet" href="/xterm.css" />
   <script src="/xterm.min.js"></script>
   <script>
-    let currentPath = '/home/webterm';
+    let currentPath = '/home/users';
     let selectedFile = null;
     let editingFile = null;
+    let authState = null;
+    let ws = null;
+    let term = null;
+    const enc = new TextEncoder();
 
-    // File browser
+    // ---- Auth ----
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById('loginUsername').value;
+      const password = document.getElementById('loginPassword').value;
+      const errEl = document.getElementById('loginError');
+      errEl.textContent = '';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        authState = data;
+        showAuthUI();
+      } catch (err) {
+        errEl.textContent = err.message;
+      }
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      const username = document.getElementById('regUsername').value;
+      const email = document.getElementById('regEmail').value;
+      const password = document.getElementById('regPassword').value;
+      const confirm = document.getElementById('regPasswordConfirm').value;
+      const errEl = document.getElementById('registerError');
+      errEl.textContent = '';
+      if (password !== confirm) { errEl.textContent = 'Passwords do not match'; return; }
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        // Auto-login after register
+        const loginRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, password }),
+        });
+        const loginData = await loginRes.json();
+        if (!loginRes.ok) throw new Error(loginData.error);
+        authState = loginData;
+        showAuthUI();
+      } catch (err) {
+        errEl.textContent = err.message;
+      }
+    }
+
+    async function handleLogout(e) {
+      e && e.preventDefault();
+      try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      } catch {}
+      authState = null;
+      ws?.close();
+      ws = null;
+      term = null;
+      document.getElementById('terminal').innerHTML = '';
+      showAuthUI();
+    }
+
+    function showRegister(e) {
+      e && e.preventDefault();
+      document.getElementById('loginCard').style.display = 'none';
+      document.getElementById('registerCard').style.display = '';
+      document.getElementById('homeCard').style.display = 'none';
+      document.getElementById('registerError').textContent = '';
+      document.getElementById('regUsername')?.focus();
+    }
+
+    function showLogin(e) {
+      e && e.preventDefault();
+      document.getElementById('registerCard').style.display = 'none';
+      document.getElementById('homeCard').style.display = 'none';
+      document.getElementById('loginCard').style.display = '';
+      document.getElementById('loginError').textContent = '';
+      document.getElementById('loginUsername')?.focus();
+    }
+
+    function enterApp() {
+      document.getElementById('authOverlay').style.display = 'none';
+      document.getElementById('appContainer').style.display = '';
+      if (authState) document.getElementById('headerUser').textContent = authState.username;
+      initTerminal();
+      loadInitialFiles();
+    }
+
+    async function switchUser() {
+      await handleLogout(null);
+      showLogin(null);
+    }
+
+    function showAuthUI() {
+      document.getElementById('appContainer').style.display = 'none';
+      document.getElementById('authOverlay').style.display = 'flex';
+      document.getElementById('loginCard').style.display = 'none';
+      document.getElementById('registerCard').style.display = 'none';
+      document.getElementById('homeCard').style.display = 'none';
+      if (authState) {
+        document.getElementById('homeCard').style.display = '';
+        document.getElementById('welcomeText').textContent = `Logged in as ${authState.username}`;
+      } else {
+        document.getElementById('loginCard').style.display = '';
+      }
+    }
+
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        const data = await res.json();
+        if (res.ok && data.authenticated) authState = data;
+      } catch {}
+      if (authState) {
+        enterApp();
+      } else {
+        showAuthUI();
+      }
+    }
+
+    // ---- Terminal ----
+
+    function connectWs() {
+      if (!authState) return;
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const cols = term ? term.cols : 80;
+      const rows = term ? term.rows : 24;
+      ws = new WebSocket(`${proto}//${location.host}/ws?cols=${cols}&rows=${rows}`);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => { if (term) term.focus(); };
+
+      ws.onmessage = (evt) => {
+        if (typeof evt.data === 'string') return;
+        const buf = new Uint8Array(evt.data);
+        if (buf[0] === 0x30 && term) term.write(buf.slice(1)); // '0' = OUTPUT
+      };
+
+      ws.onclose = () => {
+        ws = null;
+        if (authState && term) {
+          term.write('\r\n\x1b[31mReconnecting...\x1b[0m\r\n');
+          setTimeout(connectWs, 3000);
+        }
+      };
+
+      ws.onerror = () => { try { ws?.close(); } catch {} };
+    }
+
+    function initTerminal() {
+      const termEl = document.getElementById('terminal');
+      if (!term) {
+        term = new Terminal({
+          cursorBlink: true,
+          fontFamily: 'Cascadia Code, Fira Code, Consolas, monospace',
+          fontSize: 13,
+          theme: { background: '#1e1e1e', foreground: '#d4d4d4', cursor: '#aeafad', selectionBackground: '#264f78' },
+        });
+        term.open(termEl);
+
+        term.onData((data) => {
+          if (!ws || ws.readyState !== WebSocket.OPEN) return;
+          const encoded = enc.encode(data);
+          const payload = new Uint8Array(encoded.length + 1);
+          payload[0] = 0x30; // '0' = INPUT
+          payload.set(encoded, 1);
+          ws.send(payload);
+        });
+
+        term.onResize(({ cols, rows }) => {
+          if (!ws || ws.readyState !== WebSocket.OPEN) return;
+          const msg = enc.encode(JSON.stringify({ columns: cols, rows: rows }));
+          const payload = new Uint8Array(msg.length + 1);
+          payload[0] = 0x31; // '1' = RESIZE_TERMINAL
+          payload.set(msg, 1);
+          ws.send(payload);
+        });
+
+        function fitTerm() {
+          if (!termEl.clientWidth || !termEl.clientHeight) return;
+          const viewport = termEl.querySelector('.xterm-viewport');
+          if (!viewport || !term.cols || !term.rows) return;
+          const cellW = viewport.scrollWidth / term.cols;
+          const cellH = viewport.scrollHeight / term.rows;
+          if (!cellW || !cellH) return;
+          const cols = Math.max(10, Math.floor(termEl.clientWidth / cellW));
+          const rows = Math.max(2, Math.floor(termEl.clientHeight / cellH));
+          if (cols !== term.cols || rows !== term.rows) term.resize(cols, rows);
+        }
+        setTimeout(fitTerm, 150);
+        window.addEventListener('resize', fitTerm);
+      }
+      termEl.addEventListener('click', () => term.focus());
+      term.focus();
+      connectWs();
+    }
+
+    // ---- File Explorer ----
+
     async function loadFiles(dir) {
       currentPath = dir;
       selectedFile = null;
       closeImagePreview();
       closeEditor();
-      const res = await fetch(`/api/files?dir=${encodeURIComponent(dir)}`);
-      const data = await res.json();
-      renderBreadcrumb(data.path);
-      renderFileList(data.items);
+      try {
+        const res = await fetch(`/api/files?dir=${encodeURIComponent(dir)}`, { credentials: 'include' });
+        const data = await res.json();
+        if (!res.ok) {
+          document.getElementById('fileList').innerHTML = `<div class="empty-state">Error: ${data.error || res.statusText}</div>`;
+          return;
+        }
+        renderBreadcrumb(data.path);
+        renderFileList(data.items);
+      } catch (err) {
+        document.getElementById('fileList').innerHTML = `<div class="empty-state">Failed to load files</div>`;
+      }
     }
 
-    function renderBreadcrumb(path) {
-      const parts = path.split('/').filter(Boolean);
+    function renderBreadcrumb(filePath) {
+      const parts = filePath.split('/').filter(Boolean);
       let html = `<span onclick="navigateTo('/')">root</span>`;
       let accumulated = '';
       for (const part of parts) {
         accumulated += '/' + part;
-        html += `<span class="sep">/</span><span onclick="navigateTo('${accumulated}')">${part}</span>`;
+        const p = accumulated;
+        html += `<span class="sep">/</span><span onclick="navigateTo('${p}')">${part}</span>`;
       }
       document.getElementById('breadcrumb').innerHTML = html;
     }
 
     function renderFileList(items) {
       const list = document.getElementById('fileList');
-      if (items.length === 0) {
+      if (!items || items.length === 0) {
         list.innerHTML = '<div class="empty-state">Empty directory</div>';
         return;
       }
       list.innerHTML = items.map(item => {
-        const icon = item.isDirectory ? '📁' : getImageIcon(item.name);
+        const icon = item.isDirectory ? '📁' : getFileIcon(item.name);
         const size = item.size != null ? formatSize(item.size) : '';
         const modified = item.modified ? new Date(item.modified).toLocaleString() : '';
         const sel = selectedFile === item.path ? ' selected' : '';
-        return `<div class="file-item${sel}" ondblclick="openItem('${item.path}', ${item.isDirectory})" onclick="selectFile('${item.path}', event)" oncontextmenu="showContextMenu(event, '${item.path}', ${item.isDirectory})">
+        const p = item.path.replace(/'/g, "\\'");
+        return `<div class="file-item${sel}" ondblclick="openItem('${p}', ${item.isDirectory})" onclick="selectFile('${p}', event)" oncontextmenu="showContextMenu(event, '${p}', ${item.isDirectory})">
           <span class="icon">${icon}</span>
           <span class="name">${item.name}</span>
           ${size ? `<span class="size">${size}</span>` : ''}
@@ -139,14 +453,11 @@
       }).join('');
     }
 
-    function getImageIcon(name) {
+    function getFileIcon(name) {
       const ext = name.split('.').pop().toLowerCase();
-      const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico', 'avif'];
-      if (imageExts.includes(ext)) return '🖼️';
-      const textExts = ['txt', 'md', 'log', 'csv'];
-      if (textExts.includes(ext)) return '📄';
-      const codeExts = ['js', 'ts', 'py', 'html', 'css', 'json', 'xml', 'yml', 'yaml', 'sh', 'bash', 'rb', 'go', 'rs', 'c', 'cpp', 'h', 'java', 'php', 'sql', 'md'];
-      if (codeExts.includes(ext)) return '📝';
+      if (['png','jpg','jpeg','gif','svg','webp','bmp','ico','avif'].includes(ext)) return '🖼️';
+      if (['js','ts','py','html','css','json','xml','yml','yaml','sh','bash','rb','go','rs','c','cpp','h','java','php','sql'].includes(ext)) return '📝';
+      if (['txt','md','log','csv'].includes(ext)) return '📄';
       return '📄';
     }
 
@@ -156,48 +467,123 @@
       return (bytes / 1048576).toFixed(1) + ' MB';
     }
 
-    function navigateTo(path) { loadFiles(path); }
+    function navigateTo(p) { loadFiles(p); }
 
-    function selectFile(path, e) {
-      if (e) e.stopPropagation();
-      selectedFile = path;
-      fetch(`/api/files?dir=${encodeURIComponent(currentPath)}`).then(r => r.json()).then(data => renderFileList(data.items));
+    function setUploadStatus(message) {
+      document.getElementById('uploadStatus').textContent = message || '';
     }
 
-    async function openItem(path, isDir) {
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result || '');
+          resolve(result.includes(',') ? result.split(',')[1] : result);
+        };
+        reader.onerror = () => reject(reader.error || new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function uploadSelectedFiles(event) {
+      const input = event.target;
+      uploadFiles(input.files).finally(() => { input.value = ''; });
+    }
+
+    async function uploadFiles(fileList) {
+      const files = Array.from(fileList || []).filter(file => file && file.name);
+      if (files.length === 0) return;
+
+      let uploaded = 0;
+      setUploadStatus(`Uploading 0/${files.length}`);
+      try {
+        for (const file of files) {
+          const safeName = file.name.replace(/[\\/]/g, '_');
+          const data = await fileToBase64(file);
+          const targetPath = `${currentPath.replace(/\/$/, '')}/${safeName}`;
+          const res = await fetch('/api/files/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ file: targetPath, data, encoding: 'base64' }),
+          });
+          const result = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(result.error || `Failed to upload ${file.name}`);
+          uploaded += 1;
+          setUploadStatus(`Uploading ${uploaded}/${files.length}`);
+        }
+        setUploadStatus(files.length === 1 ? 'Uploaded 1 file' : `Uploaded ${files.length} files`);
+        loadFiles(currentPath);
+        setTimeout(() => setUploadStatus(''), 3000);
+      } catch (err) {
+        setUploadStatus(err.message);
+      }
+    }
+
+    function initFileDropZone() {
+      const list = document.getElementById('fileList');
+      if (!list) return;
+
+      ['dragenter', 'dragover'].forEach(type => {
+        list.addEventListener(type, (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          list.classList.add('drag-over');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(type => {
+        list.addEventListener(type, (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (type === 'dragleave' && list.contains(event.relatedTarget)) return;
+          list.classList.remove('drag-over');
+        });
+      });
+
+      list.addEventListener('drop', (event) => {
+        const files = event.dataTransfer ? event.dataTransfer.files : [];
+        uploadFiles(files);
+      });
+    }
+
+    function selectFile(p, e) {
+      if (e) e.stopPropagation();
+      selectedFile = p;
+      fetch(`/api/files?dir=${encodeURIComponent(currentPath)}`, { credentials: 'include' })
+        .then(r => r.json()).then(data => renderFileList(data.items));
+    }
+
+    async function openItem(p, isDir) {
       if (isDir) {
-        loadFiles(path);
+        loadFiles(p);
       } else {
-        const ext = path.split('.').pop().toLowerCase();
-        const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico', 'avif'];
-        if (imageExts.includes(ext)) {
-          showImagePreview(path);
+        const ext = p.split('.').pop().toLowerCase();
+        if (['png','jpg','jpeg','gif','svg','webp','bmp','ico','avif'].includes(ext)) {
+          showImagePreview(p);
         } else {
-          openTextEditor(path);
+          openTextEditor(p);
         }
       }
     }
 
-    async function showImagePreview(path) {
-      const preview = document.getElementById('imagePreview');
-      const img = document.getElementById('previewImg');
-      const info = document.getElementById('imageInfo');
-      img.src = `/api/files/read?file=${encodeURIComponent(path)}`;
-      info.textContent = path;
-      preview.classList.add('active');
+    function showImagePreview(p) {
+      document.getElementById('previewImg').src = `/api/files/read?file=${encodeURIComponent(p)}`;
+      document.getElementById('imageInfo').textContent = p;
+      document.getElementById('imagePreview').classList.add('active');
     }
 
     function closeImagePreview() {
       document.getElementById('imagePreview').classList.remove('active');
     }
 
-    async function openTextEditor(path) {
-      editingFile = path;
+    async function openTextEditor(p) {
+      editingFile = p;
       document.getElementById('textEditor').classList.add('active');
       document.getElementById('fileList').style.display = 'none';
       document.getElementById('breadcrumb').style.display = 'none';
-      document.getElementById('editorFileName').textContent = path;
-      const res = await fetch(`/api/files/read?file=${encodeURIComponent(path)}`);
+      document.getElementById('editorFileName').textContent = p;
+      const res = await fetch(`/api/files/read?file=${encodeURIComponent(p)}`, { credentials: 'include' });
       const data = await res.json();
       document.getElementById('editorTextarea').value = data.content;
     }
@@ -215,49 +601,44 @@
       await fetch('/api/files/write', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file: editingFile, content })
+        credentials: 'include',
+        body: JSON.stringify({ file: editingFile, content }),
       });
     }
 
-    function showContextMenu(e, path, isDir) {
+    function showContextMenu(e, p, isDir) {
       e.preventDefault();
       e.stopPropagation();
       const menu = document.getElementById('contextMenu');
       let html = '';
-      if (!isDir) {
-        html += `<div class="context-menu-item" onclick="copyPath('${path}')">📋 Copy path</div>`;
-      }
+      if (!isDir) html += `<div class="context-menu-item" onclick="copyPath('${p}')">📋 Copy path</div>`;
       html += `<div class="context-menu-sep"></div>`;
-      html += `<div class="context-menu-item" style="color:#f44747" onclick="deleteItem('${path}')">🗑️ Delete</div>`;
+      html += `<div class="context-menu-item" style="color:#f44747" onclick="deleteItem('${p}')">🗑️ Delete</div>`;
       menu.innerHTML = html;
       menu.style.left = e.clientX + 'px';
       menu.style.top = e.clientY + 'px';
       menu.classList.add('active');
     }
 
-    function copyPath(path) {
-      navigator.clipboard.writeText(path);
-      hideContextMenu();
-    }
+    function copyPath(p) { navigator.clipboard.writeText(p); hideContextMenu(); }
 
-    async function deleteItem(path) {
-      if (!confirm(`Delete ${path}?`)) return;
+    async function deleteItem(p) {
+      if (!confirm(`Delete ${p}?`)) return;
       await fetch('/api/files/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path })
+        credentials: 'include',
+        body: JSON.stringify({ path: p }),
       });
       loadFiles(currentPath);
       hideContextMenu();
     }
 
-    function hideContextMenu() {
-      document.getElementById('contextMenu').classList.remove('active');
-    }
+    function hideContextMenu() { document.getElementById('contextMenu').classList.remove('active'); }
 
     document.addEventListener('click', hideContextMenu);
 
-    // Resize handle
+    // ---- Resize handle ----
     const resizeHandle = document.getElementById('resizeHandle');
     let isResizing = false;
     resizeHandle.addEventListener('mousedown', (e) => {
@@ -276,123 +657,27 @@
       document.querySelector('.file-panel').style.flex = `0 0 ${100 - clamped}%`;
     });
     document.addEventListener('mouseup', () => {
-      if (isResizing) {
-        isResizing = false;
-        resizeHandle.classList.remove('active');
-        document.body.style.cursor = '';
-      }
+      if (isResizing) { isResizing = false; resizeHandle.classList.remove('active'); document.body.style.cursor = ''; }
     });
 
-    // Terminal via WebSocket — speaks ttyd binary protocol directly
-    (function initTerminal() {
-      const termEl = document.getElementById('terminal');
-      const enc = new TextEncoder();
+    // ---- Initial load ----
 
-      const term = new Terminal({
-        cursorBlink: true,
-        fontFamily: 'Cascadia Code, Fira Code, Consolas, monospace',
-        fontSize: 13,
-        theme: {
-          background: '#1e1e1e',
-          foreground: '#d4d4d4',
-          cursor: '#aeafad',
-          selectionBackground: '#264f78',
-        },
-      });
-      term.open(termEl);
-      term.focus();
-      termEl.addEventListener('click', () => term.focus());
-
-      function fitTerm() {
-        if (!termEl.clientWidth || !termEl.clientHeight) return;
-        const viewport = termEl.querySelector('.xterm-viewport');
-        if (!viewport || !term.cols || !term.rows) return;
-        const cellW = viewport.scrollWidth / term.cols;
-        const cellH = viewport.scrollHeight / term.rows;
-        if (!cellW || !cellH) return;
-        const cols = Math.max(10, Math.floor(termEl.clientWidth / cellW));
-        const rows = Math.max(2, Math.floor(termEl.clientHeight / cellH));
-        if (cols !== term.cols || rows !== term.rows) term.resize(cols, rows);
-      }
-      setTimeout(fitTerm, 150);
-      window.addEventListener('resize', fitTerm);
-
-      let ws = null;
-
-      function sendInput(data) {
-        console.log('[term] onData fired, ws state:', ws?.readyState, 'data:', JSON.stringify(data));
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-          console.warn('[term] ws not open, dropping input');
-          return;
-        }
-        const encoded = enc.encode(data);
-        const payload = new Uint8Array(encoded.length + 1);
-        payload[0] = 0x30; // '0' = INPUT
-        payload.set(encoded, 1);
-        ws.send(payload);
-        console.log('[term] sent input bytes:', payload.length);
-      }
-
-      function sendResize(cols, rows) {
-        if (!ws || ws.readyState !== WebSocket.OPEN) return;
-        const msg = enc.encode(JSON.stringify({ columns: cols, rows: rows }));
-        const payload = new Uint8Array(msg.length + 1);
-        payload[0] = 0x31; // '1' = RESIZE_TERMINAL
-        payload.set(msg, 1);
-        ws.send(payload);
-      }
-
-      function connect() {
-        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${proto}//${location.host}`);
-        ws.binaryType = 'arraybuffer';
-
-        ws.onopen = () => {
-          console.log('[term] WS connected, cols:', term.cols, 'rows:', term.rows);
-          term.focus();
-          ws.send(enc.encode(JSON.stringify({ AuthToken: '', columns: term.cols, rows: term.rows })));
-        };
-
-        ws.onmessage = (evt) => {
-          if (typeof evt.data === 'string') return;
-          const buf = new Uint8Array(evt.data);
-          console.log('[term] received msg type:', buf[0].toString(16), 'len:', buf.length);
-          if (buf[0] === 0x30) term.write(buf.slice(1)); // '0' = OUTPUT
-        };
-
-        ws.onclose = (e) => {
-          console.log('[term] WS closed, code:', e.code);
-          setTimeout(connect, 3000);
-        };
-        ws.onerror = (e) => {
-          console.error('[term] WS error:', e);
-          ws.close();
-        };
-      }
-
-      term.onData(sendInput);
-      term.onResize(({ cols, rows }) => sendResize(cols, rows));
-
-      // Fallback: capture keydown on the terminal container in case xterm focus fails
-      termEl.addEventListener('keydown', (e) => {
-        console.log('[term] keydown on termEl:', e.key);
-      });
-
-      connect();
-    })();
-
-    // Initial load
     async function loadInitialFiles() {
+      if (!authState) return;
       try {
-        const res = await fetch('/api/config');
+        const res = await fetch('/api/config', { credentials: 'include' });
         const config = await res.json();
-        loadFiles(config.fileExplorerHome || currentPath);
+        currentPath = config.fileExplorerHome || currentPath;
+        const userDisplay = document.getElementById('userDisplay');
+        if (userDisplay) userDisplay.textContent = `${authState.username} @ ${authState.homeDir || currentPath}`;
+        loadFiles(currentPath);
       } catch {
         loadFiles(currentPath);
       }
     }
 
-    loadInitialFiles();
+    initFileDropZone();
+    checkAuth();
   </script>
 </body>
 </html>
