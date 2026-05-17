@@ -2,7 +2,16 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const pty = require('node-pty');
 
+import fs from 'fs/promises';
+import path from 'path';
 import { getUserHomeDir } from './auth.js';
+
+async function ensureBashrc(username, homeDir) {
+  const bashrcPath = path.join(homeDir, '.bashrc');
+  const ps1 = `\\[\\e[96m\\]${username}\\[\\e[90m\\] → \\[\\e[93m\\]\\w\\[\\e[0m\\] \\[\\e[92m\\]\\$\\[\\e[0m\\] `;
+  const content = `[ -f /etc/bash.bashrc ] && . /etc/bash.bashrc\nPS1='${ps1}'\n`;
+  await fs.writeFile(bashrcPath, content, { flag: 'wx' }).catch(() => {});
+}
 
 const IDLE_TIMEOUT = 30 * 60 * 1000;
 
@@ -84,9 +93,10 @@ class TerminalManager {
     this._cleanupInterval.unref();
   }
 
-  getSession(username, clientWs, cols, rows) {
+  async getSession(username, clientWs, cols, rows) {
     let session = this.sessions.get(username);
     if (!session) {
+      await ensureBashrc(username, getUserHomeDir(username));
       session = new PtySession(username, cols, rows);
       this.sessions.set(username, session);
     }

@@ -6,77 +6,76 @@
   <title>Web Terminal</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1e1e1e; color: #d4d4d4; }
+    html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #151515; color: #E8E3E3; }
     .container { display: flex; height: 100vh; }
-    .terminal-panel { flex: 1; display: flex; flex-direction: column; min-width: 300px; border-right: 2px solid #3c3c3c; }
+    .terminal-panel { flex: 1; display: flex; flex-direction: column; min-width: 300px; border-right: 2px solid #2D2D2D; }
     .file-panel { flex: 1; display: flex; flex-direction: column; min-width: 300px; }
-    .panel-header { padding: 10px 16px; background: #252526; border-bottom: 1px solid #3c3c3c; font-size: 13px; font-weight: 600; color: #cccccc; display: flex; align-items: center; gap: 8px; }
+    .panel-header { padding: 10px 16px; background: #1C1C1C; border-bottom: 1px solid #2D2D2D; font-size: 13px; font-weight: 600; color: #E8E3E3; display: flex; align-items: center; gap: 8px; }
     .panel-header svg { width: 16px; height: 16px; }
-    .terminal-frame { flex: 1; border: none; background: #1e1e1e; }
-    .breadcrumb { padding: 8px 16px; background: #2d2d2d; border-bottom: 1px solid #3c3c3c; font-size: 12px; color: #9cdcfe; display: flex; align-items: center; gap: 4px; min-height: 36px; }
-    .breadcrumb span { cursor: pointer; color: #9cdcfe; }
-    .breadcrumb span:hover { text-decoration: underline; color: #dcdcaa; }
-    .breadcrumb .sep { color: #666; cursor: default; }
+    .terminal-frame { flex: 1; border: none; background: #151515; }
+    .breadcrumb { padding: 8px 16px; background: #1C1C1C; border-bottom: 1px solid #2D2D2D; font-size: 12px; color: #8AA6A2; display: flex; align-items: center; gap: 4px; min-height: 36px; }
+    .breadcrumb span { cursor: pointer; color: #8AA6A2; }
+    .breadcrumb span:hover { text-decoration: underline; color: #D9BC8C; }
+    .breadcrumb .sep { color: #424242; cursor: default; }
     .breadcrumb .sep:hover { text-decoration: none; }
     .file-list { flex: 1; overflow-y: auto; padding: 4px 0; }
     .file-item { display: flex; align-items: center; padding: 4px 16px; cursor: pointer; font-size: 13px; gap: 10px; user-select: none; }
-    .file-item:hover { background: #2a2d2e; }
-    .file-item.selected { background: #094771; }
+    .file-item:hover { background: #1D1D1D; }
+    .file-item.selected { background: #1A2B3C; }
     .file-item .icon { width: 18px; text-align: center; flex-shrink: 0; }
     .file-item .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .file-item .size { color: #858585; font-size: 11px; flex-shrink: 0; }
-    .file-item .modified { color: #858585; font-size: 11px; flex-shrink: 0; }
-    .image-preview { border-top: 1px solid #3c3c3c; background: #1e1e1e; padding: 12px; display: none; }
+    .file-item .size { color: #8AA6A2; font-size: 11px; flex-shrink: 0; }
+    .file-item .modified { color: #8AA6A2; font-size: 11px; flex-shrink: 0; }
+    .image-preview { border-top: 1px solid #2D2D2D; background: #151515; padding: 12px; display: none; }
     .image-preview.active { display: block; }
-    .image-preview img { max-width: 100%; max-height: 400px; border: 1px solid #3c3c3c; }
-    .image-preview .image-info { font-size: 11px; color: #858585; margin-top: 8px; }
-    .image-preview .close-btn { position: absolute; top: 8px; right: 12px; cursor: pointer; color: #858585; font-size: 18px; background: none; border: none; }
-    .image-preview .close-btn:hover { color: #d4d4d4; }
+    .image-preview img { max-width: 100%; max-height: 400px; border: 1px solid #2D2D2D; }
+    .image-preview .image-info { font-size: 11px; color: #8AA6A2; margin-top: 8px; }
+    .image-preview .close-btn { position: absolute; top: 8px; right: 12px; cursor: pointer; color: #8AA6A2; font-size: 18px; background: none; border: none; }
+    .image-preview .close-btn:hover { color: #E8E3E3; }
     .image-preview-wrapper { position: relative; }
     .text-editor { flex: 1; display: none; flex-direction: column; }
     .text-editor.active { display: flex; }
-    .text-editor textarea { flex: 1; background: #1e1e1e; color: #d4d4d4; border: none; padding: 12px; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; font-size: 13px; resize: none; outline: none; line-height: 1.5; }
-    .text-editor .editor-header { padding: 6px 16px; background: #252526; border-bottom: 1px solid #3c3c3c; font-size: 12px; color: #cccccc; display: flex; align-items: center; gap: 8px; }
-    .text-editor .save-btn { background: #0e639c; color: white; border: none; padding: 3px 12px; font-size: 11px; cursor: pointer; border-radius: 3px; }
-    .text-editor .save-btn:hover { background: #1177bb; }
-    .context-menu { position: fixed; background: #252526; border: 1px solid #3c3c3c; border-radius: 4px; padding: 4px 0; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); min-width: 160px; display: none; }
+    .text-editor .editor-header { padding: 6px 16px; background: #1C1C1C; border-bottom: 1px solid #2D2D2D; font-size: 12px; color: #E8E3E3; display: flex; align-items: center; gap: 8px; }
+    .text-editor .save-btn { background: #8DA3B9; color: #151515; border: none; padding: 3px 12px; font-size: 11px; cursor: pointer; border-radius: 3px; }
+    .text-editor .save-btn:hover { background: #9DB3C9; }
+    .context-menu { position: fixed; background: #1C1C1C; border: 1px solid #2D2D2D; border-radius: 4px; padding: 4px 0; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.5); min-width: 160px; display: none; }
     .context-menu.active { display: block; }
     .context-menu-item { padding: 6px 16px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; }
-    .context-menu-item:hover { background: #094771; }
-    .context-menu-sep { height: 1px; background: #3c3c3c; margin: 4px 0; }
+    .context-menu-item:hover { background: #1A2B3C; }
+    .context-menu-sep { height: 1px; background: #2D2D2D; margin: 4px 0; }
     .resize-handle { width: 4px; cursor: col-resize; background: transparent; flex-shrink: 0; }
-    .resize-handle:hover, .resize-handle.active { background: #007fd4; }
-    .auth-overlay { position: fixed; inset: 0; background: #1a1a2e; display: flex; align-items: center; justify-content: center; z-index: 9999; }
-    .auth-card { background: #16213e; border: 1px solid #3c3c3c; border-radius: 8px; padding: 40px; width: 100%; max-width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    .resize-handle:hover, .resize-handle.active { background: #8AA6A2; }
+    .auth-overlay { position: fixed; inset: 0; background: #151515; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .auth-card { background: #1C1C1C; border: 1px solid #2D2D2D; border-radius: 8px; padding: 40px; width: 100%; max-width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
     .auth-header { text-align: center; margin-bottom: 32px; }
-    .auth-header h1 { color: #d4d4d4; font-size: 24px; margin-bottom: 8px; }
-    .auth-header .subtitle { color: #888; font-size: 14px; }
+    .auth-header h1 { color: #E8E3E3; font-size: 24px; margin-bottom: 8px; }
+    .auth-header .subtitle { color: #8AA6A2; font-size: 14px; }
     .auth-form { display: flex; flex-direction: column; gap: 16px; }
-    .form-group label { display: block; color: #9cdcfe; font-size: 13px; margin-bottom: 4px; }
-    .form-group input { background: #1e1e1e; border: 1px solid #3c3c3c; color: #d4d4d4; padding: 8px 12px; border-radius: 4px; font-size: 14px; outline: none; }
-    .form-group input:focus { border-color: #007fd4; }
-    .auth-btn { background: #0e639c; color: white; border: none; padding: 10px; font-size: 14px; border-radius: 4px; cursor: pointer; margin-top: 8px; }
-    .auth-btn:hover { background: #1177bb; }
-    .auth-btn.secondary { background: #444; margin-top: 8px; }
-    .auth-btn.secondary:hover { background: #555; }
-    .auth-error { color: #f44747; font-size: 13px; min-height: 20px; margin-top: 4px; }
-    .auth-switch { text-align: center; color: #888; font-size: 13px; margin-top: 12px; }
-    .auth-switch a { color: #9cdcfe; cursor: pointer; }
+    .form-group label { display: block; color: #8AA6A2; font-size: 13px; margin-bottom: 4px; }
+    .form-group input { background: #151515; border: 1px solid #2D2D2D; color: #E8E3E3; padding: 8px 12px; border-radius: 4px; font-size: 14px; outline: none; width: 100%; }
+    .form-group input:focus { border-color: #8AA6A2; }
+    .auth-btn { background: #8DA3B9; color: #151515; border: none; padding: 10px; font-size: 14px; border-radius: 4px; cursor: pointer; margin-top: 8px; font-weight: 600; }
+    .auth-btn:hover { background: #9DB3C9; }
+    .auth-btn.secondary { background: #2D2D2D; color: #E8E3E3; margin-top: 8px; font-weight: normal; }
+    .auth-btn.secondary:hover { background: #424242; }
+    .auth-error { color: #B66467; font-size: 13px; min-height: 20px; margin-top: 4px; }
+    .auth-switch { text-align: center; color: #8AA6A2; font-size: 13px; margin-top: 12px; }
+    .auth-switch a { color: #8DA3B9; cursor: pointer; }
     .auth-switch a:hover { text-decoration: underline; }
     .home-actions { text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; margin-top: 24px; }
-    .home-actions .subtitle { color: #4ade80; }
-    .empty-state { display: flex; align-items: center; justify-content: center; height: 100%; color: #666; font-size: 14px; }
-    .logout-btn { margin-left: auto; background: none; color: #858585; border: 1px solid #444; padding: 2px 8px; font-size: 11px; cursor: pointer; border-radius: 3px; white-space: nowrap; }
-    .logout-btn:hover { background: #c0392b; color: white; border-color: #c0392b; }
-    .header-user { font-size: 11px; color: #666; margin-left: auto; }
-    .upload-btn { margin-left: auto; background: #0e639c; color: white; border: none; padding: 3px 10px; font-size: 11px; cursor: pointer; border-radius: 3px; white-space: nowrap; }
-    .upload-btn:hover { background: #1177bb; }
-    .upload-status { color: #858585; font-size: 11px; max-width: 42%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .file-list.drag-over { outline: 2px dashed #0e639c; outline-offset: -8px; background: rgba(14, 99, 156, 0.12); }
+    .home-actions .subtitle { color: #8C977D; }
+    .empty-state { display: flex; align-items: center; justify-content: center; height: 100%; color: #424242; font-size: 14px; }
+    .logout-btn { margin-left: auto; background: none; color: #8AA6A2; border: 1px solid #2D2D2D; padding: 2px 8px; font-size: 11px; cursor: pointer; border-radius: 3px; white-space: nowrap; }
+    .logout-btn:hover { background: #B66467; color: #151515; border-color: #B66467; }
+    .header-user { font-size: 11px; color: #424242; margin-left: auto; }
+    .upload-btn { margin-left: auto; background: #8DA3B9; color: #151515; border: none; padding: 3px 10px; font-size: 11px; cursor: pointer; border-radius: 3px; white-space: nowrap; font-weight: 600; }
+    .upload-btn:hover { background: #9DB3C9; }
+    .upload-status { color: #8AA6A2; font-size: 11px; max-width: 42%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-list.drag-over { outline: 2px dashed #8DA3B9; outline-offset: -8px; background: rgba(141, 163, 185, 0.08); }
     ::-webkit-scrollbar { width: 10px; }
-    ::-webkit-scrollbar-track { background: #1e1e1e; }
-    ::-webkit-scrollbar-thumb { background: #424242; border-radius: 5px; }
-    ::-webkit-scrollbar-thumb:hover { background: #555; }
+    ::-webkit-scrollbar-track { background: #151515; }
+    ::-webkit-scrollbar-thumb { background: #2D2D2D; border-radius: 5px; }
+    ::-webkit-scrollbar-thumb:hover { background: #424242; }
   </style>
 </head>
 <body>
@@ -172,10 +171,10 @@
         <div class="editor-header">
           <span id="editorFileName"></span>
           <button class="save-btn" onclick="saveFile()">Save</button>
-          <button class="save-btn" style="background:#c93" onclick="closeEditor()">Close</button>
+          <button class="save-btn" style="background:#D9BC8C;color:#151515" onclick="closeEditor()">Close</button>
           <span style="margin-left:auto;color:#666;font-size:11px;" id="userDisplay"></span>
         </div>
-        <textarea id="editorTextarea" spellcheck="false"></textarea>
+        <div id="monacoContainer" style="flex:1;min-height:0;overflow:hidden;"></div>
       </div>
     </div>
   </div>
@@ -183,6 +182,7 @@
 
   <link rel="stylesheet" href="/xterm.css" />
   <script src="/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.min.js"></script>
   <script>
     let currentPath = '/home/users';
     let selectedFile = null;
@@ -190,7 +190,103 @@
     let authState = null;
     let ws = null;
     let term = null;
+    let monacoEditor = null;
     const enc = new TextEncoder();
+
+    function getMonacoLanguage(filename) {
+      const ext = filename.split('.').pop().toLowerCase();
+      const map = {
+        js: 'javascript', mjs: 'javascript', cjs: 'javascript',
+        ts: 'typescript',
+        py: 'python',
+        r: 'r', rmd: 'r',
+        html: 'html', htm: 'html',
+        css: 'css', scss: 'scss', less: 'less',
+        json: 'json', jsonc: 'json',
+        xml: 'xml', svg: 'xml',
+        yml: 'yaml', yaml: 'yaml',
+        md: 'markdown',
+        sh: 'shell', bash: 'shell', zsh: 'shell',
+        sql: 'sql',
+        go: 'go',
+        rs: 'rust',
+        c: 'c', h: 'c',
+        cpp: 'cpp', cc: 'cpp', cxx: 'cpp', hpp: 'cpp',
+        java: 'java',
+        php: 'php',
+        rb: 'ruby',
+        cs: 'csharp',
+        kt: 'kotlin',
+        swift: 'swift',
+        lua: 'lua',
+        pl: 'perl',
+        dockerfile: 'dockerfile',
+        toml: 'ini',
+      };
+      return map[ext] || 'plaintext';
+    }
+
+    function initMonaco() {
+      return new Promise((resolve) => {
+        if (monacoEditor) { resolve(); return; }
+        require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' } });
+        require(['vs/editor/editor.main'], () => {
+          monaco.editor.defineTheme('appTheme', {
+            base: 'vs-dark', inherit: true,
+            rules: [
+              { token: '',          foreground: 'E8E3E3', background: '151515' },
+              { token: 'comment',   foreground: '424242', fontStyle: 'italic' },
+              { token: 'keyword',   foreground: 'A988B0' },
+              { token: 'string',    foreground: '8C977D' },
+              { token: 'number',    foreground: 'D9BC8C' },
+              { token: 'regexp',    foreground: 'B66467' },
+              { token: 'type',      foreground: '8DA3B9' },
+              { token: 'class',     foreground: '8DA3B9' },
+              { token: 'function',  foreground: 'D9BC8C' },
+              { token: 'variable',  foreground: 'E8E3E3' },
+              { token: 'operator',  foreground: 'E8E3E3' },
+              { token: 'delimiter', foreground: 'E8E3E3' },
+            ],
+            colors: {
+              'editor.background':                    '#151515',
+              'editor.foreground':                    '#E8E3E3',
+              'editorCursor.foreground':              '#E8E3E3',
+              'editor.lineHighlightBackground':       '#1C1C1C',
+              'editor.selectionBackground':           '#1A2B3C',
+              'editor.inactiveSelectionBackground':   '#1A2B3C80',
+              'editorLineNumber.foreground':          '#424242',
+              'editorLineNumber.activeForeground':    '#8AA6A2',
+              'editorWidget.background':              '#1C1C1C',
+              'editorWidget.border':                  '#2D2D2D',
+              'editorSuggestWidget.background':       '#1C1C1C',
+              'editorSuggestWidget.border':           '#2D2D2D',
+              'editorSuggestWidget.selectedBackground': '#1A2B3C',
+              'input.background':                     '#151515',
+              'input.border':                         '#2D2D2D',
+              'input.foreground':                     '#E8E3E3',
+              'scrollbarSlider.background':           '#2D2D2D80',
+              'scrollbarSlider.hoverBackground':      '#42424280',
+              'scrollbarSlider.activeBackground':     '#8AA6A280',
+              'editorBracketMatch.background':        '#1A2B3C',
+              'editorBracketMatch.border':            '#8AA6A2',
+            },
+          });
+          monacoEditor = monaco.editor.create(document.getElementById('monacoContainer'), {
+            value: '',
+            theme: 'appTheme',
+            automaticLayout: true,
+            minimap: { enabled: false },
+            fontSize: 13,
+            fontFamily: "'Cascadia Code', 'Fira Code', Consolas, monospace",
+            lineHeight: 19,
+            scrollBeyondLastLine: false,
+            renderWhitespace: 'selection',
+            padding: { top: 8 },
+          });
+          resolve();
+        });
+      });
+    }
 
     // ---- Auth ----
 
@@ -358,7 +454,15 @@
           cursorBlink: true,
           fontFamily: 'Cascadia Code, Fira Code, Consolas, monospace',
           fontSize: 13,
-          theme: { background: '#1e1e1e', foreground: '#d4d4d4', cursor: '#aeafad', selectionBackground: '#264f78' },
+          theme: {
+            background: '#151515', foreground: '#E8E3E3',
+            cursor: '#E8E3E3', cursorAccent: '#151515',
+            selectionBackground: '#1A2B3C',
+            black: '#151515',   red: '#B66467',  green: '#8C977D', yellow: '#D9BC8C',
+            blue: '#E8E3E3',    magenta: '#A988B0', cyan: '#8AA6A2', white: '#E8E3E3',
+            brightBlack: '#424242', brightRed: '#B66467', brightGreen: '#8C977D', brightYellow: '#D9BC8C',
+            brightBlue: '#8DA3B9',  brightMagenta: '#A988B0', brightCyan: '#8AA6A2', brightWhite: '#E8E3E3',
+          },
         });
         term.open(termEl);
 
@@ -410,47 +514,86 @@
         const res = await fetch(`/api/files?dir=${encodeURIComponent(dir)}`, { credentials: 'include' });
         const data = await res.json();
         if (!res.ok) {
-          document.getElementById('fileList').innerHTML = `<div class="empty-state">Error: ${data.error || res.statusText}</div>`;
+          const errEl = document.createElement('div');
+          errEl.className = 'empty-state';
+          errEl.textContent = `Error: ${data.error || res.statusText}`;
+          document.getElementById('fileList').replaceChildren(errEl);
           return;
         }
         renderBreadcrumb(data.path);
         renderFileList(data.items);
       } catch (err) {
-        document.getElementById('fileList').innerHTML = `<div class="empty-state">Failed to load files</div>`;
+        const errEl = document.createElement('div');
+        errEl.className = 'empty-state';
+        errEl.textContent = 'Failed to load files';
+        document.getElementById('fileList').replaceChildren(errEl);
       }
     }
 
     function renderBreadcrumb(filePath) {
+      const container = document.getElementById('breadcrumb');
+      container.innerHTML = '';
+      const rootSpan = document.createElement('span');
+      rootSpan.textContent = 'root';
+      rootSpan.addEventListener('click', () => navigateTo('/'));
+      container.appendChild(rootSpan);
       const parts = filePath.split('/').filter(Boolean);
-      let html = `<span onclick="navigateTo('/')">root</span>`;
       let accumulated = '';
       for (const part of parts) {
         accumulated += '/' + part;
         const p = accumulated;
-        html += `<span class="sep">/</span><span onclick="navigateTo('${p}')">${part}</span>`;
+        const sep = document.createElement('span');
+        sep.className = 'sep';
+        sep.textContent = '/';
+        container.appendChild(sep);
+        const span = document.createElement('span');
+        span.textContent = part;
+        span.addEventListener('click', () => navigateTo(p));
+        container.appendChild(span);
       }
-      document.getElementById('breadcrumb').innerHTML = html;
     }
 
     function renderFileList(items) {
       const list = document.getElementById('fileList');
+      list.innerHTML = '';
       if (!items || items.length === 0) {
-        list.innerHTML = '<div class="empty-state">Empty directory</div>';
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = 'Empty directory';
+        list.appendChild(empty);
         return;
       }
-      list.innerHTML = items.map(item => {
+      for (const item of items) {
         const icon = item.isDirectory ? '📁' : getFileIcon(item.name);
         const size = item.size != null ? formatSize(item.size) : '';
         const modified = item.modified ? new Date(item.modified).toLocaleString() : '';
-        const sel = selectedFile === item.path ? ' selected' : '';
-        const p = item.path.replace(/'/g, "\\'");
-        return `<div class="file-item${sel}" ondblclick="openItem('${p}', ${item.isDirectory})" onclick="selectFile('${p}', event)" oncontextmenu="showContextMenu(event, '${p}', ${item.isDirectory})">
-          <span class="icon">${icon}</span>
-          <span class="name">${item.name}</span>
-          ${size ? `<span class="size">${size}</span>` : ''}
-          ${modified ? `<span class="modified">${modified}</span>` : ''}
-        </div>`;
-      }).join('');
+        const div = document.createElement('div');
+        div.className = 'file-item' + (selectedFile === item.path ? ' selected' : '');
+        div.addEventListener('dblclick', () => openItem(item.path, item.isDirectory));
+        div.addEventListener('click', (e) => selectFile(item.path, e));
+        div.addEventListener('contextmenu', (e) => showContextMenu(e, item.path, item.isDirectory));
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'icon';
+        iconSpan.textContent = icon;
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'name';
+        nameSpan.textContent = item.name;
+        div.appendChild(iconSpan);
+        div.appendChild(nameSpan);
+        if (size) {
+          const sizeSpan = document.createElement('span');
+          sizeSpan.className = 'size';
+          sizeSpan.textContent = size;
+          div.appendChild(sizeSpan);
+        }
+        if (modified) {
+          const modSpan = document.createElement('span');
+          modSpan.className = 'modified';
+          modSpan.textContent = modified;
+          div.appendChild(modSpan);
+        }
+        list.appendChild(div);
+      }
     }
 
     function getFileIcon(name) {
@@ -582,10 +725,15 @@
       document.getElementById('textEditor').classList.add('active');
       document.getElementById('fileList').style.display = 'none';
       document.getElementById('breadcrumb').style.display = 'none';
-      document.getElementById('editorFileName').textContent = p;
+      document.getElementById('editorFileName').textContent = p.split('/').pop();
       const res = await fetch(`/api/files/read?file=${encodeURIComponent(p)}`, { credentials: 'include' });
       const data = await res.json();
-      document.getElementById('editorTextarea').value = data.content;
+      await initMonaco();
+      const oldModel = monacoEditor.getModel();
+      if (oldModel) oldModel.dispose();
+      const model = monaco.editor.createModel(data.content || '', getMonacoLanguage(p));
+      monacoEditor.setModel(model);
+      monacoEditor.focus();
     }
 
     function closeEditor() {
@@ -596,8 +744,8 @@
     }
 
     async function saveFile() {
-      if (!editingFile) return;
-      const content = document.getElementById('editorTextarea').value;
+      if (!editingFile || !monacoEditor) return;
+      const content = monacoEditor.getValue();
       await fetch('/api/files/write', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -610,11 +758,23 @@
       e.preventDefault();
       e.stopPropagation();
       const menu = document.getElementById('contextMenu');
-      let html = '';
-      if (!isDir) html += `<div class="context-menu-item" onclick="copyPath('${p}')">📋 Copy path</div>`;
-      html += `<div class="context-menu-sep"></div>`;
-      html += `<div class="context-menu-item" style="color:#f44747" onclick="deleteItem('${p}')">🗑️ Delete</div>`;
-      menu.innerHTML = html;
+      menu.innerHTML = '';
+      if (!isDir) {
+        const copyEl = document.createElement('div');
+        copyEl.className = 'context-menu-item';
+        copyEl.textContent = '📋 Copy path';
+        copyEl.addEventListener('click', () => copyPath(p));
+        menu.appendChild(copyEl);
+      }
+      const sepEl = document.createElement('div');
+      sepEl.className = 'context-menu-sep';
+      menu.appendChild(sepEl);
+      const deleteEl = document.createElement('div');
+      deleteEl.className = 'context-menu-item';
+      deleteEl.style.color = '#f44747';
+      deleteEl.textContent = '🗑️ Delete';
+      deleteEl.addEventListener('click', () => deleteItem(p));
+      menu.appendChild(deleteEl);
       menu.style.left = e.clientX + 'px';
       menu.style.top = e.clientY + 'px';
       menu.classList.add('active');

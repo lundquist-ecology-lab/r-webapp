@@ -88,27 +88,23 @@ app.get('/api/config', authRequired, (req, res) => {
 });
 
 function sanitizePath(req, reqPath) {
-  // If the path starts with /home/users/<username>, strip to just the suffix
-  const home = getUserHomeDir(req.user.username);
-  if (reqPath.startsWith(home + '/') || reqPath === home) {
-    return reqPath;
+  const home = path.resolve(getUserHomeDir(req.user.username));
+  const resolved = path.resolve(reqPath);
+  if (resolved !== home && !resolved.startsWith(home + path.sep)) {
+    return null;
   }
-  // Reject paths outside the user's home
-  return null;
+  return resolved;
 }
 
 app.get('/api/files', authRequired, async (req, res) => {
   const dir = req.query.dir || getUserHomeDir(req.user.username);
-  // Verify path is within user's home
-  const home = getUserHomeDir(req.user.username);
-  if (!dir.startsWith(home + '/') && dir !== home) {
-    return res.status(403).json({ error: 'Access denied: outside home directory' });
-  }
+  const safeDir = sanitizePath(req, dir);
+  if (!safeDir) return res.status(403).json({ error: 'Access denied: outside home directory' });
   try {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const entries = await fs.readdir(safeDir, { withFileTypes: true });
     const items = await Promise.all(
       entries.map(async (entry) => {
-        const fullPath = path.join(dir, entry.name);
+        const fullPath = path.join(safeDir, entry.name);
         let stat;
         try { stat = await fs.stat(fullPath); } catch { return null; }
         if (!stat) return null;
@@ -128,7 +124,7 @@ app.get('/api/files', authRequired, async (req, res) => {
       if (!a.isDirectory && b.isDirectory) return 1;
       return a.name.localeCompare(b.name);
     });
-    res.json({ path: dir, items });
+    res.json({ path: safeDir, items });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -137,22 +133,20 @@ app.get('/api/files', authRequired, async (req, res) => {
 app.get('/api/files/read', authRequired, async (req, res) => {
   const file = req.query.file;
   if (!file) return res.status(400).json({ error: 'No file specified' });
-  const home = getUserHomeDir(req.user.username);
-  if (!file.startsWith(home + '/') && file !== home) {
-    return res.status(403).json({ error: 'Access denied: outside home directory' });
-  }
+  const safeFile = sanitizePath(req, file);
+  if (!safeFile) return res.status(403).json({ error: 'Access denied: outside home directory' });
   try {
-    const stat = await fs.stat(file);
+    const stat = await fs.stat(safeFile);
     if (stat.isDirectory()) return res.status(400).json({ error: 'Path is a directory' });
-    const isImage = /\.(png|jpg|jpeg|gif|svg|webp|bmp|ico|avif)$/i.test(file);
+    const isImage = /\.(png|jpg|jpeg|gif|svg|webp|bmp|ico|avif)$/i.test(safeFile);
     if (isImage) {
-      const data = await fs.readFile(file);
-      const ext = path.extname(file).slice(1);
+      const data = await fs.readFile(safeFile);
+      const ext = path.extname(safeFile).slice(1);
       const mime = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
       res.set('Content-Type', mime);
       res.send(data);
     } else {
-      const content = await fs.readFile(file, 'utf-8');
+      const content = await fs.readFile(safeFile, 'utf-8');
       res.json({ content, size: content.length });
     }
   } catch (err) {
@@ -162,14 +156,12 @@ app.get('/api/files/read', authRequired, async (req, res) => {
 
 app.get('/api/files/list', authRequired, async (req, res) => {
   const dir = req.query.dir || getUserHomeDir(req.user.username);
-  const home = getUserHomeDir(req.user.username);
-  if (!dir.startsWith(home + '/') && dir !== home) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
+  const safeDir = sanitizePath(req, dir);
+  if (!safeDir) return res.status(403).json({ error: 'Access denied' });
   try {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const entries = await fs.readdir(safeDir, { withFileTypes: true });
     const items = await Promise.all(entries.map(async (entry) => {
-      const fullPath = path.join(dir, entry.name);
+      const fullPath = path.join(safeDir, entry.name);
       let stat;
       try { stat = await fs.stat(fullPath); } catch { return null; }
       if (!stat) return null;
@@ -195,14 +187,11 @@ app.get('/api/files/list', authRequired, async (req, res) => {
 app.post('/api/files/write', authRequired, async (req, res) => {
   const { file, content } = req.body;
   if (!file || content === undefined) return res.status(400).json({ error: 'Missing file or content' });
-  const home = getUserHomeDir(req.user.username);
-  if (!file.startsWith(home + '/') && file !== home) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
+  const safeFile = sanitizePath(req, file);
+  if (!safeFile) return res.status(403).json({ error: 'Access denied' });
   try {
-    // Ensure parent dir exists
-    await fs.mkdir(path.dirname(file), { recursive: true });
-    await fs.writeFile(file, content, 'utf-8');
+    await fs.mkdir(path.dirname(safeFile), { recursive: true });
+    await fs.writeFile(safeFile, content, 'utf-8');
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -231,12 +220,10 @@ app.post('/api/files/upload', authRequired, async (req, res) => {
 app.post('/api/files/mkdir', authRequired, async (req, res) => {
   const { dir } = req.body;
   if (!dir) return res.status(400).json({ error: 'Missing dir' });
-  const home = getUserHomeDir(req.user.username);
-  if (!dir.startsWith(home + '/') && dir !== home) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
+  const safeDir = sanitizePath(req, dir);
+  if (!safeDir) return res.status(403).json({ error: 'Access denied' });
   try {
-    await fs.mkdir(dir, { recursive: true });
+    await fs.mkdir(safeDir, { recursive: true });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -246,16 +233,14 @@ app.post('/api/files/mkdir', authRequired, async (req, res) => {
 app.post('/api/files/delete', authRequired, async (req, res) => {
   const { path: filePath } = req.body;
   if (!filePath) return res.status(400).json({ error: 'Missing path' });
-  const home = getUserHomeDir(req.user.username);
-  if (!filePath.startsWith(home + '/') && filePath !== home) {
-    return res.status(403).json({ error: 'Access denied' });
-  }
+  const safePath = sanitizePath(req, filePath);
+  if (!safePath) return res.status(403).json({ error: 'Access denied' });
   try {
-    const stat = await fs.stat(filePath);
+    const stat = await fs.stat(safePath);
     if (stat.isDirectory()) {
-      await fs.rm(filePath, { recursive: true, force: true });
+      await fs.rm(safePath, { recursive: true, force: true });
     } else {
-      await fs.unlink(filePath);
+      await fs.unlink(safePath);
     }
     res.json({ success: true });
   } catch (err) {
@@ -291,14 +276,14 @@ httpServer.on('upgrade', (request, socket, head) => {
     return;
   }
 
-  wss.handleUpgrade(request, socket, head, (clientWs) => {
+  wss.handleUpgrade(request, socket, head, async (clientWs) => {
     // Extract terminal dimensions from query params
     const cols = parseInt(url.searchParams.get('cols')) || 80;
     const rows = parseInt(url.searchParams.get('rows')) || 24;
 
     try {
-      const session = terminalManager.getSession(user.username, clientWs, cols, rows);
-      console.log(`[term] terminal connected for ${user.username} on port ${session.port}`);
+      const session = await terminalManager.getSession(user.username, clientWs, cols, rows);
+      console.log(`[term] terminal connected for ${user.username}`);
     } catch (err) {
       console.error(`[term] Error creating session for ${user.username}:`, err.message);
       clientWs.send(new TextEncoder().encode(JSON.stringify({ type: 'error', message: err.message })));

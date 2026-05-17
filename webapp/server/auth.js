@@ -72,7 +72,46 @@ export async function register({ username, email, password }) {
   if (existingEmail) throw new Error('Email already registered');
 
   const pwHash = await bcrypt.hash(password, SALT_ROUNDS);
-  await ensureUserDir(username);
+  const homeDir = await ensureUserDir(username);
+
+  // Write a pretty .bashrc for the new user
+  const bashrc = `
+# ~/.bashrc
+
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+    . /etc/bashrc
+fi
+
+# User specific environment
+if ! [[ "$PATH" =~ "$HOME/.local/bin:$HOME/bin:" ]]; then
+    PATH="$HOME/.local/bin:$HOME/bin:$PATH"
+fi
+export PATH
+
+# Pretty prompt
+export PS1="\\\\033[01;32m][\\\\u\\\\033[01;37m] @ \\\\033[01;36m][\\\\H\\\\033[00;37m] [\\\\033[01;35m][\\\\w\\\\033[00;32m]][\\\\033[00;32m]\\\\\\\\\\\\\\\\$ \\\\033[00m"
+
+# Enable color support
+export CLICOLOR=1
+export LSCOLORS=Exfxcxdxbxegedabagacad
+alias ls="ls -G"
+alias grep="grep --color=auto"
+
+# History
+export HISTSIZE=10000
+export HISTFILE=~/.bash_history
+shopt -s histappend
+shopt -s cmdhist
+shopt -s hostcomplete
+shopt -s extglob
+
+# Environment variables
+export EDITOR=vim
+export VISUAL=vim
+`;
+
+  await fs.writeFile(path.join(homeDir, '.bashrc'), bashrc.trimStart() + '\n', 'utf-8');
 
   insertUser.run(username, email, pwHash);
   return { username, email };

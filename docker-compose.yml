@@ -6,7 +6,6 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - /:/host
       - user-data:/home/users
     environment:
       - TZ=UTC
