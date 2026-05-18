@@ -15,6 +15,11 @@ const ALLOWED_USERNAMES = (process.env.ALLOWED_USERNAMES || '')
   .map(u => u.trim())
   .filter(Boolean);
 
+const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || '')
+  .split(',')
+  .map(u => u.trim())
+  .filter(Boolean);
+
 // Ensure DB directory exists
 await fs.mkdir(DB_DIR, { recursive: true });
 const dbPath = path.join(DB_DIR, 'auth.db');
@@ -90,7 +95,7 @@ fi
 export PATH
 
 # Pretty prompt
-export PS1="\\\\033[01;32m][\\\\u\\\\033[01;37m] @ \\\\033[01;36m][\\\\H\\\\033[00;37m] [\\\\033[01;35m][\\\\w\\\\033[00;32m]][\\\\033[00;32m]\\\\\\\\\\\\\\\\$ \\\\033[00m"
+PS1='\\[\\e[01;32m\\]][\\u\\[\\e[01;37m\\]] @ \\[\\e[01;36m\\][\\H\\[\\e[00;37m\\]] [\\[\\e[01;35m\\]\\w\\[\\e[00;32m\\]]\\$ \\[\\e[0m\\]'
 
 # Enable color support
 export CLICOLOR=1
@@ -147,4 +152,13 @@ export function invalidateUserSessions(username) {
 
 export async function ensureDir(pathStr) {
   await fs.mkdir(pathStr, { recursive: true });
+}
+
+export function isAdmin(username) {
+  return ADMIN_USERNAMES.length > 0 && ADMIN_USERNAMES.includes(username);
+}
+
+const listAllUsers = db.prepare('SELECT username FROM users');
+export function listUsernames() {
+  return listAllUsers.all().map(r => r.username);
 }

@@ -6,11 +6,55 @@ import fs from 'fs/promises';
 import path from 'path';
 import { getUserHomeDir } from './auth.js';
 
+export const SKEL_DIR = process.env.SKEL_DIR || '/home/users/.skel';
+
+async function copySkelDir(src, dest) {
+  let entries;
+  try {
+    entries = await fs.readdir(src, { withFileTypes: true });
+  } catch (err) {
+    if (err.code === 'ENOENT') return;
+    throw err;
+  }
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      await fs.mkdir(destPath, { recursive: true });
+      await copySkelDir(srcPath, destPath);
+    } else if (entry.isFile()) {
+      await fs.copyFile(srcPath, destPath, fs.constants.COPYFILE_EXCL).catch(() => {});
+    }
+  }
+}
+
+export async function syncSkelFiles(homeDir) {
+  await copySkelDir(SKEL_DIR, homeDir).catch((err) => {
+    console.error('[skel] sync error:', err.message);
+  });
+}
+
 async function ensureBashrc(username, homeDir) {
   const bashrcPath = path.join(homeDir, '.bashrc');
   const ps1 = `\\[\\e[96m\\]${username}\\[\\e[90m\\] → \\[\\e[93m\\]\\w\\[\\e[0m\\] \\[\\e[92m\\]\\$\\[\\e[0m\\] `;
-  const content = `[ -f /etc/bash.bashrc ] && . /etc/bash.bashrc\nPS1='${ps1}'\n`;
-  await fs.writeFile(bashrcPath, content, { flag: 'wx' }).catch(() => {});
+  const ps1Line = `PS1='${ps1}'`;
+
+  let existing = '';
+  try {
+    existing = await fs.readFile(bashrcPath, 'utf-8');
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+
+  if (existing.includes(ps1Line)) return;
+
+  const stripped = existing
+    .split('\n')
+    .filter(line => !/^(export\s+)?PS1=/.test(line.trim()))
+    .join('\n')
+    .trimEnd();
+
+  await fs.writeFile(bashrcPath, (stripped ? stripped + '\n' : '') + ps1Line + '\n', 'utf-8');
 }
 
 const IDLE_TIMEOUT = 30 * 60 * 1000;
@@ -96,7 +140,9 @@ class TerminalManager {
   async getSession(username, clientWs, cols, rows) {
     let session = this.sessions.get(username);
     if (!session) {
-      await ensureBashrc(username, getUserHomeDir(username));
+      const homeDir = getUserHomeDir(username);
+      await ensureBashrc(username, homeDir);
+      await syncSkelFiles(homeDir);
       session = new PtySession(username, cols, rows);
       this.sessions.set(username, session);
     }

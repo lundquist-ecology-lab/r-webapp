@@ -6,8 +6,8 @@ import { WebSocket } from 'ws';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { register as registerUser, login as loginUser, logout as logoutUser, getSession, getUserHomeDir } from './auth.js';
-import { terminalManager } from './terminalManager.js';
+import { register as registerUser, login as loginUser, logout as logoutUser, getSession, getUserHomeDir, isAdmin, listUsernames } from './auth.js';
+import { terminalManager, SKEL_DIR, syncSkelFiles } from './terminalManager.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fileExplorerHome = process.env.FILE_EXPLORER_HOME || '/home/webterm';
@@ -35,13 +35,23 @@ function authRequired(req, res, next) {
   next();
 }
 
+function adminRequired(req, res, next) {
+  const token = extractSessionToken(req);
+  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  const user = getSession(token);
+  if (!user) return res.status(401).json({ error: 'Session expired' });
+  if (!isAdmin(user.username)) return res.status(403).json({ error: 'Admin access required' });
+  req.user = user;
+  next();
+}
+
 // ---- Auth routes ----
 app.get('/api/auth/me', async (req, res) => {
   const token = extractSessionToken(req);
   if (!token) return res.status(401).json({ error: 'Not authenticated' });
   const user = getSession(token);
   if (!user) return res.status(401).json({ error: 'Session expired' });
-  res.json({ authenticated: true, username: user.username, email: user.email, homeDir: getUserHomeDir(user.username) });
+  res.json({ authenticated: true, username: user.username, email: user.email, homeDir: getUserHomeDir(user.username), isAdmin: isAdmin(user.username) });
 });
 
 app.post('/api/auth/register', async (req, res) => {
@@ -66,7 +76,7 @@ app.post('/api/auth/login', async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/',
     });
-    res.json({ authenticated: true, username: result.username, email: result.email, homeDir: getUserHomeDir(result.username) });
+    res.json({ authenticated: true, username: result.username, email: result.email, homeDir: getUserHomeDir(result.username), isAdmin: isAdmin(result.username) });
   } catch (err) {
     res.status(401).json({ error: err.message });
   }
@@ -149,6 +159,20 @@ app.get('/api/files/read', authRequired, async (req, res) => {
       const content = await fs.readFile(safeFile, 'utf-8');
       res.json({ content, size: content.length });
     }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/files/download', authRequired, async (req, res) => {
+  const file = req.query.file;
+  if (!file) return res.status(400).json({ error: 'No file specified' });
+  const safeFile = sanitizePath(req, file);
+  if (!safeFile) return res.status(403).json({ error: 'Access denied: outside home directory' });
+  try {
+    const stat = await fs.stat(safeFile);
+    if (stat.isDirectory()) return res.status(400).json({ error: 'Cannot download a directory' });
+    res.download(safeFile, path.basename(safeFile));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -242,6 +266,133 @@ app.post('/api/files/delete', authRequired, async (req, res) => {
     } else {
       await fs.unlink(safePath);
     }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---- Admin skel management ----
+
+function sanitizeSkelPath(reqPath) {
+  const skelBase = path.resolve(SKEL_DIR);
+  const resolved = path.resolve(reqPath);
+  if (resolved !== skelBase && !resolved.startsWith(skelBase + path.sep)) return null;
+  return resolved;
+}
+
+async function pushSkelToAllUsers() {
+  const usernames = listUsernames();
+  await Promise.all(usernames.map(username =>
+    syncSkelFiles(getUserHomeDir(username)).catch(() => {})
+  ));
+}
+
+app.get('/api/admin/skel/list', adminRequired, async (req, res) => {
+  const dir = req.query.dir || SKEL_DIR;
+  const safeDir = sanitizeSkelPath(dir);
+  if (!safeDir) return res.status(403).json({ error: 'Access denied' });
+  try {
+    await fs.mkdir(safeDir, { recursive: true });
+    const entries = await fs.readdir(safeDir, { withFileTypes: true });
+    const items = await Promise.all(entries.map(async entry => {
+      const fullPath = path.join(safeDir, entry.name);
+      let stat;
+      try { stat = await fs.stat(fullPath); } catch { return null; }
+      return { name: entry.name, path: fullPath, isDirectory: entry.isDirectory(), isFile: stat.isFile(), size: stat.size, modified: stat.mtime };
+    })).then(items => items.filter(Boolean));
+    items.sort((a, b) => {
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    res.json({ path: safeDir, items });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/skel/read', adminRequired, async (req, res) => {
+  const file = req.query.file;
+  if (!file) return res.status(400).json({ error: 'No file specified' });
+  const safeFile = sanitizeSkelPath(file);
+  if (!safeFile) return res.status(403).json({ error: 'Access denied' });
+  try {
+    const stat = await fs.stat(safeFile);
+    if (stat.isDirectory()) return res.status(400).json({ error: 'Path is a directory' });
+    const content = await fs.readFile(safeFile, 'utf-8');
+    res.json({ content, size: content.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/skel/write', adminRequired, async (req, res) => {
+  const { file, content } = req.body;
+  if (!file || content === undefined) return res.status(400).json({ error: 'Missing file or content' });
+  const safeFile = sanitizeSkelPath(file);
+  if (!safeFile) return res.status(403).json({ error: 'Access denied' });
+  try {
+    await fs.mkdir(path.dirname(safeFile), { recursive: true });
+    await fs.writeFile(safeFile, content, 'utf-8');
+    pushSkelToAllUsers().catch(err => console.error('[skel] push error:', err.message));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/skel/upload', adminRequired, async (req, res) => {
+  const { file, data, encoding } = req.body;
+  if (!file || data === undefined) return res.status(400).json({ error: 'Missing file or data' });
+  const safeFile = sanitizeSkelPath(file);
+  if (!safeFile) return res.status(403).json({ error: 'Access denied' });
+  try {
+    await fs.mkdir(path.dirname(safeFile), { recursive: true });
+    const buf = encoding === 'base64' ? Buffer.from(data, 'base64') : Buffer.from(data);
+    await fs.writeFile(safeFile, buf);
+    pushSkelToAllUsers().catch(err => console.error('[skel] push error:', err.message));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/skel/delete', adminRequired, async (req, res) => {
+  const { path: filePath } = req.body;
+  if (!filePath) return res.status(400).json({ error: 'Missing path' });
+  const safePath = sanitizeSkelPath(filePath);
+  if (!safePath) return res.status(403).json({ error: 'Access denied' });
+  try {
+    const stat = await fs.stat(safePath);
+    if (stat.isDirectory()) {
+      await fs.rm(safePath, { recursive: true, force: true });
+    } else {
+      await fs.unlink(safePath);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/skel/download', adminRequired, async (req, res) => {
+  const file = req.query.file;
+  if (!file) return res.status(400).json({ error: 'No file specified' });
+  const safeFile = sanitizeSkelPath(file);
+  if (!safeFile) return res.status(403).json({ error: 'Access denied' });
+  try {
+    const stat = await fs.stat(safeFile);
+    if (stat.isDirectory()) return res.status(400).json({ error: 'Cannot download a directory' });
+    res.download(safeFile, path.basename(safeFile));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/admin/skel/push', adminRequired, async (req, res) => {
+  try {
+    await pushSkelToAllUsers();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
